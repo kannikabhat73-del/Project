@@ -6,34 +6,35 @@
 </head>
 <body class="bg-gray-900 text-white p-6">
 
-<!-- Header with top-right Go to Drive -->
 <h2 class="text-3xl font-bold mb-6 flex justify-between items-center">
   📁 Faculty Explorer
-  <a href="https://drive.google.com/drive/folders/1AxdFB-qHNSBP8r3LIlTexfwBS0OHJtlG?usp=drive_link"
-     target="_blank"
-     class="bg-green-500 px-4 py-2 rounded text-white hover:bg-green-600">
-    Go to Drive
-  </a>
+  <div class="space-x-2">
+    <a href="https://drive.google.com/drive/folders/1AxdFB-qHNSBP8r3LIlTexfwBS0OHJtlG?usp=drive_link"
+       target="_blank"
+       class="bg-green-500 px-4 py-2 rounded text-white hover:bg-green-600">
+      Go to Drive
+    </a>
+    <a href="delete.html" class="bg-red-500 px-4 py-2 rounded text-white hover:bg-red-600">
+      Faculty Trash
+    </a>
+  </div>
 </h2>
 
-<!-- Back Button -->
 <button onclick="goBack()" id="backBtn" class="mb-4 bg-gray-700 px-4 py-2 rounded hidden">
 ⬅ Back
 </button>
 
-<!-- Search -->
 <input type="text" id="searchInput" placeholder="Search..." class="p-2 text-black rounded mb-4 w-full"
 onkeyup="searchFiles()">
 
-<!-- Explorer Container -->
 <div id="explorer" class="space-y-3"></div>
 
 <script>
-const WEB_APP_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyJ6VHquVroeLsHaAl8avwV-ImJda4aR0RsHWDjovqtJLvNsYR4tJtXUp4OIA6s-T9qIw/exec";
+
 let fullData = [];
 let pathStack = [];
 
-// -------------- LOAD DATA -----------------
 function loadFiles(){
   fetch(WEB_APP_URL)
     .then(res => res.json())
@@ -47,36 +48,25 @@ function loadFiles(){
     });
 }
 
-// -------------- SHOW CURRENT LEVEL --------------
 function showLevel(items){
   const container = document.getElementById("explorer");
   container.innerHTML = "";
+  document.getElementById("backBtn").classList.toggle("hidden", pathStack.length===0);
 
-  // Back button
-  if(pathStack.length === 0){
-    document.getElementById("backBtn").classList.add("hidden");
-  } else {
-    document.getElementById("backBtn").classList.remove("hidden");
-  }
-
-  if(items.length === 0){
+  if(items.length===0){
     container.innerHTML = "<p class='text-gray-400 text-center text-xl mt-10'>No items found</p>";
     return;
   }
 
-  items.forEach(item => {
-    // Event with files
-    if(item.files){
+  items.forEach(item=>{
+    if(item.files){ // Event folder
       container.innerHTML += `
       <div class="bg-gray-800 p-4 rounded hover:bg-gray-700">
         <span class="font-semibold text-lg">📁 ${item.event}</span>
-        
-        <!-- IMAGES GRID -->
         <div class="grid md:grid-cols-3 gap-4 mt-4">
-          ${item.files.map(f => {
+          ${item.files.map(f=>{
             if(f.type.includes("image")){
-              return `
-              <div class="bg-black p-2 rounded">
+              return `<div class="bg-black p-2 rounded">
                 <img src="${f.url}" class="w-full h-40 object-cover rounded">
                 <p class="text-sm mt-1 text-center">${f.name}</p>
                 <div class="mt-1 flex justify-center gap-2">
@@ -86,9 +76,7 @@ function showLevel(items){
                 </div>
               </div>`;
             }
-            // Non-image files
-            return `
-            <div class="flex justify-between items-center bg-white text-black p-2 rounded">
+            return `<div class="flex justify-between items-center bg-white text-black p-2 rounded">
               <span>📄 ${f.name} (${f.date || ""})</span>
               <div class="space-x-2">
                 <a href="${f.url}" target="_blank" class="bg-blue-500 px-2 py-1 rounded text-white">Open</a>
@@ -103,7 +91,6 @@ function showLevel(items){
       return;
     }
 
-    // Other levels: Dept / Year / Month
     container.innerHTML += `
     <div ondblclick='openNext(${JSON.stringify(item)})' class="bg-gray-800 p-4 rounded cursor-pointer hover:bg-gray-700 flex justify-between items-center">
       <span>${item.name}</span>
@@ -116,50 +103,42 @@ function showLevel(items){
   });
 }
 
-// -------------- NAVIGATE INTO FOLDER --------------
 function openNext(item){
   pathStack.push(item);
-  if(item.dept && item.year && item.month && item.event){ // Event level
-    showLevel([item]);
-  } else if(item.years){
-    showLevel(item.years);
-  } else if(item.months){
-    showLevel(item.months);
-  } else if(item.events){
-    showLevel(item.events);
-  } else {
-    showLevel(item.children || []);
-  }
+  if(item.files){ showLevel([item]); }
+  else if(item.years){ showLevel(item.years); }
+  else if(item.months){ showLevel(item.months); }
+  else if(item.events){ showLevel(item.events); }
+  else { showLevel(item.children || []); }
 }
 
-// -------------- BACK BUTTON --------------
 function goBack(){
   pathStack.pop();
-  if(pathStack.length === 0){
-    showLevel(fullData);
-  } else {
-    showLevel([pathStack[pathStack.length-1]]);
-  }
+  showLevel(pathStack.length===0 ? fullData : [pathStack[pathStack.length-1]]);
 }
 
-// -------------- SEARCH ----------------
 function searchFiles(){
-  if(pathStack.length > 0) return; // only root
+  if(pathStack.length>0) return;
   const input = document.getElementById("searchInput").value.toLowerCase();
-  const items = document.querySelectorAll("#explorer > div");
-  items.forEach(item => {
+  document.querySelectorAll("#explorer > div").forEach(item=>{
     item.style.display = item.innerText.toLowerCase().includes(input) ? "flex" : "none";
   });
 }
 
-// -------------- RENAME / DELETE ----------------
-function renameFolder(id){ const n = prompt("Enter new folder name:"); if(n) alert("Renamed to "+n); }
-function deleteFolder(id){ if(confirm("Delete folder?")) alert("Folder deleted"); }
-function renameFile(id){ const n = prompt("Enter new file name:"); if(n) alert("File renamed to "+n); }
-function deleteFile(id){ if(confirm("Delete file?")) alert("File deleted"); }
+function renameFolder(id){ const n=prompt("Enter new folder name:"); if(n) alert("Renamed to "+n); }
+function deleteFolder(id){
+  if(confirm("Delete folder?")){
+    fetch(`${WEB_APP_URL}?action=delete&id=${id}&faculty=true`, { method:"POST" }).then(()=>loadFiles());
+  }
+}
+function renameFile(id){ const n=prompt("Enter new file name:"); if(n) alert("File renamed to "+n); }
+function deleteFile(id){
+  if(confirm("Delete file?")){
+    fetch(`${WEB_APP_URL}?action=delete&id=${id}&faculty=true`, { method:"POST" }).then(()=>loadFiles());
+  }
+}
 
 window.onload = loadFiles;
 </script>
-
 </body>
 </html>
