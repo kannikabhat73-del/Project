@@ -4,135 +4,161 @@
 <title>Faculty Explorer</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
 <body class="bg-gray-900 text-white p-6">
 
-<h2 class="text-3xl font-bold mb-6">📁 Faculty Explorer</h2>
+<!-- Header with top-right Go to Drive -->
+<h2 class="text-3xl font-bold mb-6 flex justify-between items-center">
+  📁 Faculty Explorer
+  <a href="https://drive.google.com/drive/folders/1AxdFB-qHNSBP8r3LIlTexfwBS0OHJtlG?usp=drive_link"
+     target="_blank"
+     class="bg-green-500 px-4 py-2 rounded text-white hover:bg-green-600">
+    Go to Drive
+  </a>
+</h2>
 
-<!-- BACK BUTTON -->
-<button onclick="goBack()" id="backBtn"
-class="mb-4 bg-gray-700 px-4 py-2 rounded hidden">
+<!-- Back Button -->
+<button onclick="goBack()" id="backBtn" class="mb-4 bg-gray-700 px-4 py-2 rounded hidden">
 ⬅ Back
 </button>
 
-<input type="text" id="searchInput"
-placeholder="Search..."
-class="p-2 text-black rounded mb-4 w-full"
+<!-- Search -->
+<input type="text" id="searchInput" placeholder="Search..." class="p-2 text-black rounded mb-4 w-full"
 onkeyup="searchFiles()">
 
+<!-- Explorer Container -->
 <div id="explorer" class="space-y-3"></div>
 
 <script>
-
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyJ6VHquVroeLsHaAl8avwV-ImJda4aR0RsHWDjovqtJLvNsYR4tJtXUp4OIA6s-T9qIw/exec";
-
+const WEB_APP_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 let fullData = [];
-let currentView = "root";
+let pathStack = [];
 
-// LOAD DATA
+// -------------- LOAD DATA -----------------
 function loadFiles(){
-fetch(WEB_APP_URL)
-.then(res => res.json())
-.then(data => {
-fullData = data;
-showRoot();
-})
-.catch(err=>{
-document.getElementById("explorer").innerHTML =
-"<p class='text-red-400'>Failed to load data ❌</p>";
-});
+  fetch(WEB_APP_URL)
+    .then(res => res.json())
+    .then(data => {
+      fullData = data;
+      pathStack = [];
+      showLevel(fullData);
+    })
+    .catch(err=>{
+      document.getElementById("explorer").innerHTML = "<p class='text-red-400'>Failed to load data...</p>";
+    });
 }
 
-// SHOW ROOT
-function showRoot(){
+// -------------- SHOW CURRENT LEVEL --------------
+function showLevel(items){
+  const container = document.getElementById("explorer");
+  container.innerHTML = "";
 
-currentView = "root";
-document.getElementById("backBtn").classList.add("hidden");
+  // Back button
+  if(pathStack.length === 0){
+    document.getElementById("backBtn").classList.add("hidden");
+  } else {
+    document.getElementById("backBtn").classList.remove("hidden");
+  }
 
-const container = document.getElementById("explorer");
-container.innerHTML = "";
+  if(items.length === 0){
+    container.innerHTML = "<p class='text-gray-400 text-center text-xl mt-10'>No items found</p>";
+    return;
+  }
 
-if(fullData.length === 0){
-container.innerHTML = "<p class='text-gray-400'>No reports found</p>";
-return;
+  items.forEach(item => {
+    // Event with files
+    if(item.files){
+      container.innerHTML += `
+      <div class="bg-gray-800 p-4 rounded hover:bg-gray-700">
+        <span class="font-semibold text-lg">📁 ${item.event}</span>
+        
+        <!-- IMAGES GRID -->
+        <div class="grid md:grid-cols-3 gap-4 mt-4">
+          ${item.files.map(f => {
+            if(f.type.includes("image")){
+              return `
+              <div class="bg-black p-2 rounded">
+                <img src="${f.url}" class="w-full h-40 object-cover rounded">
+                <p class="text-sm mt-1 text-center">${f.name}</p>
+                <div class="mt-1 flex justify-center gap-2">
+                  <button onclick='renameFile("${f.id}")' class="bg-yellow-500 text-white px-2 py-1 rounded">Rename</button>
+                  <button onclick='deleteFile("${f.id}")' class="bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+                  <a href="${f.url}" target="_blank" class="bg-green-500 px-2 py-1 rounded text-white">Go to Drive</a>
+                </div>
+              </div>`;
+            }
+            // Non-image files
+            return `
+            <div class="flex justify-between items-center bg-white text-black p-2 rounded">
+              <span>📄 ${f.name} (${f.date || ""})</span>
+              <div class="space-x-2">
+                <a href="${f.url}" target="_blank" class="bg-blue-500 px-2 py-1 rounded text-white">Open</a>
+                <button onclick='renameFile("${f.id}")' class="bg-yellow-500 text-white px-2 py-1 rounded">Rename</button>
+                <button onclick='deleteFile("${f.id}")' class="bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+                <a href="${f.url}" target="_blank" class="bg-green-500 px-2 py-1 rounded text-white">Go to Drive</a>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+      return;
+    }
+
+    // Other levels: Dept / Year / Month
+    container.innerHTML += `
+    <div ondblclick='openNext(${JSON.stringify(item)})' class="bg-gray-800 p-4 rounded cursor-pointer hover:bg-gray-700 flex justify-between items-center">
+      <span>${item.name}</span>
+      <div class="space-x-2">
+        <button onclick='renameFolder("${item.id}"); event.stopPropagation()' class="bg-yellow-500 text-white px-2 py-1 rounded">Rename</button>
+        <button onclick='deleteFolder("${item.id}"); event.stopPropagation()' class="bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+        <a href="${item.url}" target="_blank" onclick="event.stopPropagation()" class="bg-green-500 px-2 py-1 rounded text-white">Go to Drive</a>
+      </div>
+    </div>`;
+  });
 }
 
-fullData.forEach(item => {
-
-container.innerHTML += `
-<div onclick='openFolder(${JSON.stringify(item)})'
-class="bg-gray-800 p-4 rounded cursor-pointer hover:bg-gray-700">
-
-📁 ${item.dept} / ${item.year} / ${item.month} / ${item.event}
-
-</div>
-`;
-
-});
-
+// -------------- NAVIGATE INTO FOLDER --------------
+function openNext(item){
+  pathStack.push(item);
+  if(item.dept && item.year && item.month && item.event){ // Event level
+    showLevel([item]);
+  } else if(item.years){
+    showLevel(item.years);
+  } else if(item.months){
+    showLevel(item.months);
+  } else if(item.events){
+    showLevel(item.events);
+  } else {
+    showLevel(item.children || []);
+  }
 }
 
-// OPEN FOLDER
-function openFolder(item){
-
-currentView = "folder";
-document.getElementById("backBtn").classList.remove("hidden");
-
-const container = document.getElementById("explorer");
-
-container.innerHTML = `
-<h3 class="text-xl font-bold mb-4">
-📁 ${item.dept} / ${item.year} / ${item.month} / ${item.event}
-</h3>
-
-<div class="grid md:grid-cols-2 gap-4">
-
-${item.files.map(file => {
-
-if(file.type.includes("image")){
-return `
-<div class="bg-black p-2 rounded">
-<img src="${file.url}" class="w-full h-40 object-cover rounded">
-<p class="text-sm mt-1">${file.name}</p>
-</div>`;
-}
-
-return `
-<div class="flex justify-between items-center bg-white text-black p-2 rounded">
-<span>📄 ${file.name}</span>
-<a href="${file.url}" target="_blank"
-class="bg-blue-500 text-white px-2 py-1 rounded">
-Open
-</a>
-</div>`;
-}).join("")}
-
-</div>
-`;
-
-}
-
-// BACK
+// -------------- BACK BUTTON --------------
 function goBack(){
-showRoot();
+  pathStack.pop();
+  if(pathStack.length === 0){
+    showLevel(fullData);
+  } else {
+    showLevel([pathStack[pathStack.length-1]]);
+  }
 }
 
-// SEARCH
+// -------------- SEARCH ----------------
 function searchFiles(){
-
-if(currentView !== "root") return;
-
-const input = document.getElementById("searchInput").value.toLowerCase();
-const items = document.querySelectorAll("#explorer > div");
-
-items.forEach(item => {
-item.style.display = item.innerText.toLowerCase().includes(input) ? "block" : "none";
-});
-
+  if(pathStack.length > 0) return; // only root
+  const input = document.getElementById("searchInput").value.toLowerCase();
+  const items = document.querySelectorAll("#explorer > div");
+  items.forEach(item => {
+    item.style.display = item.innerText.toLowerCase().includes(input) ? "flex" : "none";
+  });
 }
+
+// -------------- RENAME / DELETE ----------------
+function renameFolder(id){ const n = prompt("Enter new folder name:"); if(n) alert("Renamed to "+n); }
+function deleteFolder(id){ if(confirm("Delete folder?")) alert("Folder deleted"); }
+function renameFile(id){ const n = prompt("Enter new file name:"); if(n) alert("File renamed to "+n); }
+function deleteFile(id){ if(confirm("Delete file?")) alert("File deleted"); }
 
 window.onload = loadFiles;
-
 </script>
 
 </body>
